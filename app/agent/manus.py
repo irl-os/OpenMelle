@@ -32,29 +32,38 @@ class Manus(ToolCallAgent):
     max_observe: int = 2000
     max_steps: int = 20
 
-    # Add general-purpose tools to the tool collection
-    available_tools: ToolCollection = Field(
-        default_factory=lambda: ToolCollection(
-            PythonExecute(), BrowserUseTool(), FileSaver(), Terminate()
+    # Persistent browser tool instance
+    browser_tool: Optional[BrowserUseTool] = Field(default=None, exclude=True)
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Initialize tools with persistent browser instance
+        if self.browser_tool is None:
+            self.browser_tool = BrowserUseTool()
+        self.available_tools = ToolCollection(
+            PythonExecute(),
+            self.browser_tool,
+            FileSaver(),
+            Terminate()
         )
-    )
 
     async def _handle_special_tool(self, name: str, result: Any, **kwargs):
         if not self._is_special_tool(name):
             return
         else:
-            await self.available_tools.get_tool(BrowserUseTool().name).cleanup()
+            if self.browser_tool:
+                await self.browser_tool.cleanup()
+                self.browser_tool = None
             await super()._handle_special_tool(name, result, **kwargs)
 
     async def get_browser_state(self) -> Optional[dict]:
         """Get the current browser state for context in next steps."""
-        browser_tool = self.available_tools.get_tool(BrowserUseTool().name)
-        if not browser_tool:
+        if not self.browser_tool:
             return None
 
         try:
-            # Get browser state directly from the tool with no context parameter
-            result = await browser_tool.get_current_state()
+            # Get browser state directly from the persistent tool instance
+            result = await self.browser_tool.get_current_state()
 
             if result.error:
                 logger.debug(f"Browser state error: {result.error}")

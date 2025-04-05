@@ -1,6 +1,7 @@
 import asyncio
 import json
-from typing import Generic, Optional, TypeVar
+import os
+from typing import Any, Generic, Optional, TypeVar
 
 from browser_use import Browser as BrowserUseBrowser
 from browser_use import BrowserConfig
@@ -73,6 +74,7 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                     "switch_tab",
                     "open_tab",
                     "close_tab",
+                    "take_screenshot",
                 ],
                 "description": "The browser action to perform",
             },
@@ -138,6 +140,7 @@ class BrowserUseTool(BaseTool, Generic[Context]):
     context: Optional[BrowserContext] = Field(default=None, exclude=True)
     dom_service: Optional[DomService] = Field(default=None, exclude=True)
     web_search_tool: WebSearch = Field(default_factory=WebSearch, exclude=True)
+    playwright: Optional[Any] = Field(default=None, exclude=True)
 
     # Context for generic functionality
     tool_context: Optional[Context] = Field(default=None, exclude=True)
@@ -151,51 +154,34 @@ class BrowserUseTool(BaseTool, Generic[Context]):
         return v
 
     async def _ensure_browser_initialized(self) -> BrowserContext:
-        """Ensure browser and context are initialized."""
-        if self.browser is None:
-            browser_config_kwargs = {"headless": False, "disable_security": True}
-
-            if config.browser_config:
-                from browser_use.browser.browser import ProxySettings
-
-                # handle proxy settings.
-                if config.browser_config.proxy and config.browser_config.proxy.server:
-                    browser_config_kwargs["proxy"] = ProxySettings(
-                        server=config.browser_config.proxy.server,
-                        username=config.browser_config.proxy.username,
-                        password=config.browser_config.proxy.password,
-                    )
-
-                browser_attrs = [
-                    "headless",
-                    "disable_security",
-                    "extra_chromium_args",
-                    "chrome_instance_path",
-                    "wss_url",
-                    "cdp_url",
-                ]
-
-                for attr in browser_attrs:
-                    value = getattr(config.browser_config, attr, None)
-                    if value is not None:
-                        if not isinstance(value, list) or value:
-                            browser_config_kwargs[attr] = value
-
-            self.browser = BrowserUseBrowser(BrowserConfig(**browser_config_kwargs))
-
+        """Ensure browser and context are initialized with persistence."""
         if self.context is None:
-            context_config = BrowserContextConfig()
+            # Set up persistent browser profile directory
+            profile_dir = "/home/toby/openmanus_browser_profiles/jupiter"
+            os.makedirs(profile_dir, exist_ok=True)
 
-            # if there is context config in the config, use it.
-            if (
-                config.browser_config
-                and hasattr(config.browser_config, "new_context_config")
-                and config.browser_config.new_context_config
-            ):
-                context_config = config.browser_config.new_context_config
+            # Create Playwright instance
+            from playwright.async_api import async_playwright
+            self.playwright = await async_playwright().start()
 
-            self.context = await self.browser.new_context(context_config)
-            self.dom_service = DomService(await self.context.get_current_page())
+            # Create persistent context with proper configuration
+            self.context = await self.playwright.chromium.launch_persistent_context(
+                profile_dir,
+                headless=False,
+                args=[
+                    "--profile-directory=Profile1",
+                    "--enable-features=NetworkService",
+                    "--disable-features=IsolateOrigins,site-per-process"
+                ],
+                proxy=config.browser_config.proxy if config.browser_config and config.browser_config.proxy else None
+            )
+
+            # Initialize DOM service with context
+            self.dom_service = DomService(self.context)
+
+            # Ensure we have at least one page
+            if not self.context.pages:
+                await self.context.new_page()
 
         return self.context
 
@@ -247,9 +233,11 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         return ToolResult(
                             error="URL is required for 'go_to_url' action"
                         )
-                    page = await context.get_current_page()
-                    await page.goto(url)
-                    await page.wait_for_load_state()
+                    if not context.pages:
+                        page = await context.new_page()
+                    else:
+                        page = context.pages[0]
+                    await page.goto(url, wait_until="networkidle")
                     return ToolResult(output=f"Navigated to {url}")
 
                 elif action == "go_back":
@@ -279,7 +267,7 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                                 error=f"Invalid search result format: {first_result}"
                             )
 
-                        page = await context.get_current_page()
+                        page = context.pages[0]
                         await page.goto(url_to_navigate)
                         await page.wait_for_load_state()
 
@@ -298,10 +286,10 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         return ToolResult(
                             error="Index is required for 'click_element' action"
                         )
-                    element = await context.get_dom_element_by_index(index)
+                    element = await self.dom_service.get_dom_element_by_index(index)
                     if not element:
                         return ToolResult(error=f"Element with index {index} not found")
-                    download_path = await context._click_element_node(element)
+                    download_path = await self.dom_service.click_element_node(element)
                     output = f"Clicked element at index {index}"
                     if download_path:
                         output += f" - Downloaded file to {download_path}"
@@ -312,10 +300,10 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         return ToolResult(
                             error="Index and text are required for 'input_text' action"
                         )
-                    element = await context.get_dom_element_by_index(index)
+                    element = await self.dom_service.get_dom_element_by_index(index)
                     if not element:
                         return ToolResult(error=f"Element with index {index} not found")
-                    await context._input_text_element_node(element, text)
+                    await self.dom_service.input_text_element_node(element, text)
                     return ToolResult(
                         output=f"Input '{text}' into element at index {index}"
                     )
@@ -339,7 +327,7 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         return ToolResult(
                             error="Text is required for 'scroll_to_text' action"
                         )
-                    page = await context.get_current_page()
+                    page = context.pages[0]
                     try:
                         locator = page.get_by_text(text, exact=False)
                         await locator.scroll_into_view_if_needed()
@@ -352,7 +340,7 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         return ToolResult(
                             error="Keys are required for 'send_keys' action"
                         )
-                    page = await context.get_current_page()
+                    page = context.pages[0]
                     await page.keyboard.press(keys)
                     return ToolResult(output=f"Sent keys: {keys}")
 
@@ -361,10 +349,10 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         return ToolResult(
                             error="Index is required for 'get_dropdown_options' action"
                         )
-                    element = await context.get_dom_element_by_index(index)
+                    element = await self.dom_service.get_dom_element_by_index(index)
                     if not element:
                         return ToolResult(error=f"Element with index {index} not found")
-                    page = await context.get_current_page()
+                    page = context.pages[0]
                     options = await page.evaluate(
                         """
                         (xpath) => {
@@ -387,10 +375,10 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         return ToolResult(
                             error="Index and text are required for 'select_dropdown_option' action"
                         )
-                    element = await context.get_dom_element_by_index(index)
+                    element = await self.dom_service.get_dom_element_by_index(index)
                     if not element:
                         return ToolResult(error=f"Element with index {index} not found")
-                    page = await context.get_current_page()
+                    page = context.pages[0]
                     await page.select_option(element.xpath, label=text)
                     return ToolResult(
                         output=f"Selected option '{text}' from dropdown at index {index}"
@@ -402,7 +390,7 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         return ToolResult(
                             error="Goal is required for 'extract_content' action"
                         )
-                    page = await context.get_current_page()
+                    page = context.pages[0]
                     try:
                         # Get page content and convert to markdown for better processing
                         html_content = await page.content()
@@ -484,6 +472,16 @@ Page content:
                     return ToolResult(output="Closed current tab")
 
                 # Utility actions
+                elif action == "take_screenshot":
+                    page = context.pages[0]
+                    await page.wait_for_load_state()
+                    await page.screenshot(
+                        path="/home/toby/dyor_shots/jupiter_perps.png",
+                        full_page=True,
+                        timeout=10000
+                    )
+                    return ToolResult(output="Screenshot saved to /home/toby/dyor_shots/jupiter_perps.png")
+
                 elif action == "wait":
                     seconds_to_wait = seconds if seconds is not None else 3
                     await asyncio.sleep(seconds_to_wait)
@@ -518,7 +516,11 @@ Page content:
                 viewport_height = ctx.config.browser_window_size.get("height", 0)
 
             # Take a screenshot for the state
-            screenshot = await ctx.take_screenshot(full_page=True)
+            await ctx.pages[0].wait_for_load_state()
+            screenshot = await ctx.take_screenshot(
+                full_page=True,
+                timeout=10000
+            )
 
             # Build the state info with all required fields
             state_info = {

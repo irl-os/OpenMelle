@@ -4,22 +4,31 @@
 
 English | [中文](README_zh.md) | [한국어](README_ko.md) | [日本語](README_ja.md)
 
-[![GitHub stars](https://img.shields.io/github/stars/mannaandpoem/OpenManus?style=social)](https://github.com/mannaandpoem/OpenManus/stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/irl-os/OpenMelle?style=social)](https://github.com/irl-os/OpenMelle/stargazers)
 &ensp;
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) &ensp;
 [![Discord Follow](https://dcbadge.vercel.app/api/server/DYn29wFk9z?style=flat)](https://discord.gg/DYn29wFk9z)
 
-# 👋 OpenManus
+# 👋 OpenMelle
 
-Manus is incredible, but OpenManus can achieve any idea without an *Invite Code* 🛫!
+OpenMelle is a fork of OpenManus focused on persistent browser sessions and enhanced automation capabilities.
 
-Our team members [@Xinbin Liang](https://github.com/mannaandpoem) and [@Jinyu Xiang](https://github.com/XiangJinyu) (core authors), along with [@Zhaoyang Yu](https://github.com/MoshiQAQ), [@Jiayi Zhang](https://github.com/didiforgithub), and [@Sirui Hong](https://github.com/stellaHSR), we are from [@MetaGPT](https://github.com/geekan/MetaGPT). The prototype is launched within 3 hours and we are keeping building!
+## Key Features
+
+- **Persistent Browser Sessions**: Maintains state between sessions using dedicated profile directories
+- **Enhanced Screenshot Capabilities**: Full-page screenshots with proper loading waits and timeouts
+- **TradingView Integration**: Specialized support for financial charting platforms
+- **DOM Interaction**: Robust element selection and manipulation
+
+OpenMelle can achieve any idea without an *Invite Code* 🛫!
+
+Our team members [@Xinbin Liang](https://github.com/mannaandpoem) and [@Jinyu Xiang](https://github.com/XiangJinyu) (core authors), along with [@Zhaoyang Yu](https://github.com/MoshiQAQ), [@Jiayi Zhang](https://github.com/didiforgithub), and [@Sirui Hong](https://github.com/stellaHSR), we are from [@MetaGPT](https://github.com/geekan/MetaGPT). The prototype was launched within 3 hours and we continue to enhance its capabilities!
 
 It's a simple implementation, so we welcome any suggestions, contributions, and feedback!
 
 Enjoy your own agent with OpenManus!
 
-We're also excited to introduce [OpenManus-RL](https://github.com/OpenManus/OpenManus-RL), an open-source project dedicated to reinforcement learning (RL)- based (such as GRPO) tuning methods for LLM agents, developed collaboratively by researchers from UIUC and OpenManus.
+We're also excited to introduce [OpenMelle-RL](https://github.com/OpenMelle/OpenMelle-RL), an open-source project dedicated to reinforcement learning (RL)-based (such as GRPO) tuning methods for LLM agents, developed collaboratively by researchers from UIUC and OpenMelle.
 
 ## Project Demo
 
@@ -34,15 +43,15 @@ We provide two installation methods. Method 2 (using uv) is recommended for fast
 1. Create a new conda environment:
 
 ```bash
-conda create -n open_manus python=3.12
-conda activate open_manus
+conda create -n open_melle python=3.12
+conda activate open_melle
 ```
 
 2. Clone the repository:
 
 ```bash
-git clone https://github.com/mannaandpoem/OpenManus.git
-cd OpenManus
+git clone https://github.com/irl-os/OpenMelle.git
+cd OpenMelle
 ```
 
 3. Install dependencies:
@@ -62,8 +71,8 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 2. Clone the repository:
 
 ```bash
-git clone https://github.com/mannaandpoem/OpenManus.git
-cd OpenManus
+git clone https://github.com/irl-os/OpenMelle.git
+cd OpenMelle
 ```
 
 3. Create a new virtual environment and activate it:
@@ -83,7 +92,25 @@ uv pip install -r requirements.txt
 
 ## Configuration
 
-OpenManus requires configuration for the LLM APIs it uses. Follow these steps to set up your configuration:
+OpenMelle requires configuration for the LLM APIs and browser settings it uses. Follow these steps to set up your configuration:
+
+### Browser Persistence Setup
+To enable persistent browser sessions, add these settings to your config.toml:
+
+```toml
+[browser]
+headless = false
+persistent_context_dir = "/path/to/browser_profiles"
+extra_chromium_args = [
+  "--user-data-dir=/path/to/browser_profiles",
+  "--profile-directory=Profile1",
+  "--enable-features=NetworkService",
+  "--disable-features=IsolateOrigins,site-per-process"
+]
+storage_state_path = "/path/to/browser_profiles/storage_state.json"
+```
+
+### LLM API Configuration
 
 1. Create a `config.toml` file in the `config` directory (you can copy from the example):
 
@@ -111,7 +138,7 @@ api_key = "sk-..."  # Replace with your actual API key
 
 ## Quick Start
 
-One line for run OpenManus:
+One line to run OpenMelle:
 
 ```bash
 python main.py
@@ -142,7 +169,7 @@ Join our networking group on Feishu and share your experience with other develop
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=mannaandpoem/OpenManus&type=Date)](https://star-history.com/#mannaandpoem/OpenManus&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=irl-os/OpenMelle&type=Date)](https://star-history.com/#irl-os/OpenMelle&Date)
 
 ## Acknowledgement
 
@@ -151,16 +178,19 @@ and [browser-use](https://github.com/browser-use/browser-use) for providing basi
 
 Additionally, we are grateful to [AAAJ](https://github.com/metauto-ai/agent-as-a-judge), [MetaGPT](https://github.com/geekan/MetaGPT), [OpenHands](https://github.com/All-Hands-AI/OpenHands) and [SWE-agent](https://github.com/SWE-agent/SWE-agent).
 
-OpenManus is built by contributors from MetaGPT. Huge thanks to this agent community!
+OpenMelle is built by contributors from MetaGPT. Huge thanks to this agent community!
 
 ## Cite
 ```bibtex
-@misc{openmanus2025,
+@misc{openmelle2025,
   author = {Xinbin Liang and Jinyu Xiang and Zhaoyang Yu and Jiayi Zhang and Sirui Hong},
-  title = {OpenManus: An open-source framework for building general AI agents},
+  title = {OpenMelle: An open-source framework for building general AI agents with persistent browser capabilities},
   year = {2025},
   publisher = {GitHub},
   journal = {GitHub repository},
-  howpublished = {\url{https://github.com/mannaandpoem/OpenManus}},
+howpublished = {\url{https://github.com/irl-os/OpenMelle}},
 }
 ```
+#example
+
+please go to jup.ag/perps and take a screen shot of the current chart, and save it to Downloads folder please
