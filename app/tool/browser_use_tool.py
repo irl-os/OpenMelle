@@ -167,11 +167,11 @@ class BrowserUseTool(BaseTool, Generic[Context]):
             # Create persistent context with proper configuration
             self.context = await self.playwright.chromium.launch_persistent_context(
                 profile_dir,
-                headless=False,
+                headless=True,
                 args=[
                     "--profile-directory=Profile1",
                     "--enable-features=NetworkService",
-                    "--disable-features=IsolateOrigins,site-per-process"
+                    "--disable-features=IsolateOrigins,site-per-process",
                 ],
                 proxy=config.browser_config.proxy if config.browser_config and config.browser_config.proxy else None
             )
@@ -475,12 +475,18 @@ Page content:
                 elif action == "take_screenshot":
                     page = context.pages[0]
                     await page.wait_for_load_state()
+                    # Ensure the target directory exists
+                    screenshot_dir = "/root/screenshots"
+                    import os
+                    os.makedirs(screenshot_dir, exist_ok=True)
+                    screenshot_path = os.path.join(screenshot_dir, "latest_screenshot.png")
+
                     await page.screenshot(
-                        path="/home/toby/dyor_shots/jupiter_perps.png",
+                        path=screenshot_path,
                         full_page=True,
                         timeout=10000
                     )
-                    return ToolResult(output="Screenshot saved to /home/toby/dyor_shots/jupiter_perps.png")
+                    return ToolResult(output=f"Screenshot saved to {screenshot_path}")
 
                 elif action == "wait":
                     seconds_to_wait = seconds if seconds is not None else 3
